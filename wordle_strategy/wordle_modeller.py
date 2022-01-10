@@ -268,7 +268,7 @@ class wordle_solver:
         else:
             return sorted_result
 
-    def solve (self, guess_word=None, use_smart=True, stupid_mode=False, attempts=6, exclude=0):
+    def solve (self, guess_word=None, use_smart=True, start_with=None, stupid_mode=False, attempts=6, exclude=0):
         '''
         Solve a single game
         '''
@@ -283,9 +283,14 @@ class wordle_solver:
         else:
             p = guess_word
 
-        if use_smart:
+        if start_with:
+            #start with the provided word
+            first_attempt = start_with
+            
+        elif use_smart:
             #use a smart word at the beginning then refine starting from there
             first_attempt = random.choice(self.common_words)
+            
         else:
             #use a random word at the beginning
             first_attempt = self.pick_random_word()
@@ -332,14 +337,14 @@ class wordle_solver:
 
         return {'game': game, 'solved' : False, 'word' : p, 'attempts' : attempts+1}
 
-    def solve_many (self, guess_word=None, use_smart=True, stupid_mode=False, N_GAMES=100, attempts=6, exclude=0):
+    def solve_many (self, guess_word=None, use_smart=True, start_with=None, stupid_mode=False, N_GAMES=100, attempts=6, exclude=0):
 
         score = 0
         stuck = 0
         win = []
 
         for i in range(N_GAMES):
-            r = self.solve(guess_word, use_smart, stupid_mode, attempts, exclude)
+            r = self.solve(guess_word=guess_word, use_smart=use_smart, start_with=start_with, stupid_mode=stupid_mode, attempts=attempts, exclude=exclude)
             score += r['solved']
             win.append (r['attempts'])
             print ('Game # %s, word %s, solved in:%s \r' % (i, r['word'], r['attempts']), end="")
