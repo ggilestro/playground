@@ -104,10 +104,16 @@ class wordle_solver:
         '''
         
         if has_letters:
+            #remove non unique occurances
             has_letters = "".join(set(has_letters.upper())) 
         
         if hasnot_letters:
+            #remove non unique occurances
             hasnot_letters = "".join(set(hasnot_letters.upper())) 
+
+        if has_letters and hasnot_letters:
+            #removing letters that are in contrast with the has_letter command
+            hasnot_letters = "".join([letter for letter in hasnot_letters if letter not in has_letters])
         
         if wordlist == None:
             wordlist = self._dictionary.copy()
@@ -173,14 +179,22 @@ class wordle_solver:
         '''
         Play a round
         '''
+        
+        def assign(word, position, character):
+            a = list(word)
+            a[position] = character
+            return "".join(a)
+            
         guess = guess.upper()
         word = word.upper()
+        
+
         result = {
                   'word' : guess,
                   'green' : '',
                   'yellow': '',
                   'grey'  : '',
-                  'pattern'  : '',
+                  'pattern'  : "_" * len(guess),
                   'score' : 0,
                   'solved' : (guess == word)
                   }
@@ -188,22 +202,28 @@ class wordle_solver:
         if len(guess) != len(word):
             return result
         
-        
+        #find green letters and removes them from the word
         for i in range(len(guess)):
             if (guess[i] == word[i]):
                 result['green'] += guess[i]
-                result['pattern'] += guess[i].upper()
+                result['pattern'] = assign(result['pattern'], i, guess[i].upper())
                 result['score'] += 5
-                
+                word = assign(word, i, '*')
+
+        #finds yellow and grey letters
+        for i in range(len(guess)):
+            if word[i] == '*':
+                pass
+            
             elif (guess[i] in word):
                 result['yellow'] += guess[i]
-                result['pattern'] += guess[i].lower()
+                result['pattern'] = assign(result['pattern'], i, guess[i].lower())
                 result['score'] += 1
                 
             else:
                 result['grey'] += guess[i]
-                result['pattern'] += '_'
-            
+                result['pattern'] = assign(result['pattern'], i, '_')
+
         return result
 
     def check_rank (self, word, wordllist=None):
@@ -322,11 +342,11 @@ class wordle_solver:
             r = self.solve(guess_word, use_smart, stupid_mode, attempts, exclude)
             score += r['solved']
             win.append (r['attempts'])
-            print ('Game %s, word %s, solved in:%s \r' % (i, r['word'], r['attempts']), end="")
+            print ('Game # %s, word %s, solved in:%s \r' % (i, r['word'], r['attempts']), end="")
 
         return {'success_rate' : score / N_GAMES, 'stuck' : stuck, 'profile' : np.array(win)}
 
 if __name__ == '__main__':
 
     g = wordle_solver('full_five_letters_words.txt')
-    print (g.solve(guess_word=None, use_smart=True, exclude=2))
+    print (g.solve(guess_word=None, use_smart=True, exclude=0))
