@@ -31,6 +31,35 @@ from functools import reduce
 
 import numpy as np
 
+def formatgametohtml(game):
+    
+    '''
+    game is list similar to this one 
+    [('RACES', '_A___'),
+    ('CAMPO', '_A_p_'),
+    ('CAFES', '_A___'),
+    ('KAPPA', '_Appa'),
+    ('PAINT', 'PA_n_'),
+    ('PAGAN', 'PAGAN')]
+    '''
+    
+    HTML_HEAD = '<html><head><link rel="stylesheet" href="wordle.css"><style type="text/css">@font-face{font-family:Gilroy;font-style:normal;font-weight:100 400;src:url(https://pouch-global-font-assets.s3.eu-central-1.amazonaws.com/Gilroy-Medium.otf)}@font-face{font-family:Gilroy;font-style:normal;font-weight:500 900;src:url(https://pouch-global-font-assets.s3.eu-central-1.amazonaws.com/Gilroy-Bold.otf)}@font-face{font-family:"Font Awesome 5 Free";font-style:normal;font-weight:900;src:url(https://use.fontawesome.com/releases/v5.6.3/webfonts/fa-solid-900.woff2) format("woff2")}@font-face{font-family:"Font Awesome 5 Brands";font-style:normal;font-weight:normal;src:url(https://use.fontawesome.com/releases/v5.6.3/webfonts/fa-brands-400.woff2) format("woff2")}</style></head><body><div id="game"><div id="board-container"><div id="board" style="width: 350px; height: 420px;">'
+
+    HTML_FOOT = "</div></div></div></body></html><body>"
+    
+    TABLE = ''
+    for (word, pattern) in game:
+        TABLE += '<game-row letters="%s" length="5"><div class="row">' % word
+        for (letter, match) in zip (word, pattern):
+            if match.isupper(): evaluation = 'correct'
+            elif match.islower(): evaluation = 'present'
+            else: evaluation = 'absent'
+            TABLE += '<game-tile letter="%s" evaluation="%s" reveal=""><div class="tile" data-state="%s" data-animation="idle">%s</div></game-tile>' % (letter, evaluation, evaluation, letter)
+        TABLE += '</div></game-row>'
+
+    return HTML_HEAD + TABLE + HTML_FOOT
+    
+
 class wordle_solver:
 
     def __init__(self, dict_file = "words_alpha.txt", word_length=5, common_words=20):
