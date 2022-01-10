@@ -198,7 +198,7 @@ class wordle_solver:
         else:
             return sorted_result
 
-    def solve (self, guess_word=None, use_smart=True, attempts=6, exclude=0):
+    def solve (self, guess_word=None, use_smart=True, stupid_mode=False, attempts=6, exclude=0):
         '''
         Solve a single game
         '''
@@ -240,25 +240,36 @@ class wordle_solver:
             
             if r['solved']: return {'game': game, 'solved' : True, 'word' : p, 'attempts' : len(game)}
 
-        #for the remaining attempts try to guess using the information gathered so far
-        for a in range(attempts-(exclude+1)):
-            r = self.compare_words(self.pick_random_word (pattern=r['pattern'], hasnot_letters=hasnot, has_letters=has), p)
-            has += r['yellow'] + r['green']
-            hasnot += r['grey']
-            game.append((r['word'], r['pattern']))
+        if not stupid_mode:
+            #for the remaining attempts try to guess using the information gathered so far
+            for a in range(attempts-(exclude+1)):
+                r = self.compare_words(self.pick_random_word (pattern=r['pattern'], hasnot_letters=hasnot, has_letters=has), p)
+                has += r['yellow'] + r['green']
+                hasnot += r['grey']
+                game.append((r['word'], r['pattern']))
 
-            if r['solved']: return {'game': game, 'solved' : True, 'word' : p, 'attempts' : len(game)}
+                if r['solved']: return {'game': game, 'solved' : True, 'word' : p, 'attempts' : len(game)}
+        else:
+            #or use stupid mode that will simply try random words
+            for a in range(attempts-(exclude+1)):
+                r = self.compare_words(self.pick_random_word(), p)
+                has += r['yellow'] + r['green']
+                hasnot += r['grey']
+                game.append((r['word'], r['pattern']))
+
+                if r['solved']: return {'game': game, 'solved' : True, 'word' : p, 'attempts' : len(game)}
+            
 
         return {'game': game, 'solved' : False, 'word' : p, 'attempts' : attempts+1}
 
-    def solve_many (self, guess_word=None, use_smart=True, N_GAMES=100, attempts=6, exclude=0):
+    def solve_many (self, guess_word=None, use_smart=True, stupid_mode=False, N_GAMES=100, attempts=6, exclude=0):
 
         score = 0
         stuck = 0
         win = []
 
         for i in range(N_GAMES):
-            r = self.solve(guess_word, use_smart, attempts, exclude)
+            r = self.solve(guess_word, use_smart, stupid_mode, attempts, exclude)
             score += r['solved']
             win.append (r['attempts'])
             print ('Game %s, word %s, solved in:%s \r' % (i, r['word'], r['attempts']), end="")
