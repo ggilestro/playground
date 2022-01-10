@@ -34,8 +34,14 @@ import numpy as np
 class wordle_solver:
 
     def __init__(self, dict_file = "words_alpha.txt", word_length=5, common_words=20):
-        self._dictionary = self.get_words(dict_file, word_length)
+        
+        self._refresh_dictionary(dict_file, word_length)
         self.common_words = self.frequency_rank(limit=common_words)
+
+    def _refresh_dictionary (self, dict_file, word_length):
+        self._dictionary = self.get_words(dict_file, word_length)
+        print ('Loaded dictionary with %s words' % len(self._dictionary))
+        
 
     def get_words(self, dict_file, word_length):
         '''
@@ -57,7 +63,7 @@ class wordle_solver:
     def hasRepeatingCharacters(self, word):
         return len(set(word)) != len(word)
 
-    def pick_random_word(self, wordlist=None, has_letters=None, hasnot_letters=None, pattern=None, verbose=False):
+    def pick_random_word(self, wordlist=None, has_letters=None, hasnot_letters=None, pattern=None, verbose=False, norepeats=False):
         '''
         picks a random word from the dictionary
         the word must contain the letters provided in has
@@ -77,7 +83,7 @@ class wordle_solver:
         if wordlist == None:
             wordlist = self._dictionary.copy()
         
-        continue_search = has = hasnot = matches = True
+        continue_search = has = hasnot = matches = hasrepeats = True
         i = 0
 
         if verbose: print ('Looking for word that has: %s and hasnot %s with pattern %s' % (has_letters, hasnot_letters, pattern))
@@ -108,6 +114,9 @@ class wordle_solver:
                 txt += ' matches tha pattern %s' % pattern
                 
             continue_search = (has == False) or (hasnot == False) or (matches == False)
+            if norepeats:
+                continue_search = self.hasRepeatingCharacters(rw)
+
 
         if verbose: print (rw + txt + ' found in %s attempts' % i)
         return rw
@@ -167,14 +176,24 @@ class wordle_solver:
                 result['pattern'] += '_'
             
         return result
+
+    def check_rank (self, word, wordllist=None):
+        '''
+        Check how the word ranks on the wordlist
+        '''
+        allwords = self.frequency_rank(limit=None, descending=True)
+        rank = {k:i for i,k in enumerate(allwords.keys())}
         
+        try:
+            return { word.upper(): rank[word.upper()], 'total' : len(rank) }
+        except:
+            return { word.upper(): 'not found', 'total' : len(allwords) }
 
-
-    def frequency_rank(self, wordlist=None, limit=50):
+    def frequency_rank(self, wordlist=None, limit=50, descending=True):
         
         from itertools import islice
 
-        def take(n, iterable):
+        def _take(n, iterable):
             "Return first n items of the iterable as a list"
             return list(islice(iterable, n))
         
@@ -183,18 +202,20 @@ class wordle_solver:
         
         if wordlist == None:
             wordlist = self._dictionary
-        
-        for word in wordlist:
-            if not self.hasRepeatingCharacters(word):
-                score = 0
-                for letter in word.strip():
-                    score += fr[letter]
-                result[word.strip().upper()] = score
 
-        sorted_result = dict(sorted(result.items(), key=lambda item: item[1], reverse=True))
+        if limit:
+            wordlist = [word for word in wordlist if not self.hasRepeatingCharacters(word)]
+
+        for word in wordlist:
+            score = 0
+            for letter in word.strip():
+                score += fr[letter]
+            result[word.strip().upper()] = score
+
+        sorted_result = dict(sorted(result.items(), key=lambda item: item[1], reverse=descending))
         
         if limit:
-            return take(limit, sorted_result.keys())
+            return _take(limit, sorted_result.keys())
         else:
             return sorted_result
 
@@ -229,7 +250,7 @@ class wordle_solver:
             
         #explore for N times a word that does not have any of the letters we found so far
         for a in range(exclude):
-            tw = self.pick_random_word (hasnot_letters=hasnot+has)
+            tw = self.pick_random_word (hasnot_letters=hasnot+has, norepeats=True)
             if tw == '': stuck += 1
                 
 
@@ -276,5 +297,7 @@ class wordle_solver:
 
         return {'success_rate' : score / N_GAMES, 'stuck' : stuck, 'profile' : np.array(win)}
 
-#g = wordle_solver('english_five_letters_words.txt')
-#g.solve(guess_word=None, use_smart=True, N_GAMES=1, exclude=0)
+if __name__ == '__main__':
+
+    g = wordle_solver('full_five_letters_words.txt')
+    print (g.solve(guess_word=None, use_smart=True, exclude=2))

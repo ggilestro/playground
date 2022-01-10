@@ -23,6 +23,8 @@ prick
 ninja
 study
 hoist
+sleep
+sleet
 gaffe
 croak
 clues
