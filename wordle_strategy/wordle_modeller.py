@@ -70,8 +70,7 @@ class wordle_solver:
     def _refresh_dictionary (self, dict_file, word_length):
         self._dictionary = self.get_words(dict_file, word_length)
         print ('Loaded dictionary with %s words' % len(self._dictionary))
-        
-
+    
     def get_words(self, dict_file, word_length):
         '''
         select words by length from a complete dictionary
@@ -92,7 +91,12 @@ class wordle_solver:
     def hasRepeatingCharacters(self, word):
         return len(set(word)) != len(word)
 
-    def pick_random_word(self, wordlist=None, has_letters=None, hasnot_letters=None, pattern=None, verbose=False, norepeats=False):
+    def pick_smart_word(self):
+        '''
+        '''
+        return random.choice(self.common_words)
+
+    def pick_random_word(self, wordlist=None, has_letters=None, hasnot_letters=None, pattern=None, norepeats=False, verbose=False):
         '''
         picks a random word from the dictionary
         the word must contain the letters provided in has
@@ -121,7 +125,7 @@ class wordle_solver:
         continue_search = has = hasnot = matches = hasrepeats = True
         i = 0
 
-        if verbose: print ('Looking for word that has: %s and hasnot %s with pattern %s' % (has_letters, hasnot_letters, pattern))
+        if verbose: print ('Looking for word that has [%s] and has not [%s] with pattern [%s]' % (has_letters, hasnot_letters, pattern))
 
         while continue_search:
             try:
@@ -148,9 +152,7 @@ class wordle_solver:
                 matches = m1 and m2
                 txt += ' matches tha pattern %s' % pattern
                 
-            continue_search = (has == False) or (hasnot == False) or (matches == False)
-            if norepeats:
-                continue_search = self.hasRepeatingCharacters(rw)
+            continue_search = (has == False) or (hasnot == False) or (matches == False) or (norepeats and self.hasRepeatingCharacters(rw))
 
 
         if verbose: print (rw + txt + ' found in %s attempts' % i)
@@ -294,19 +296,31 @@ class wordle_solver:
         else:
             #use a random word at the beginning
             first_attempt = self.pick_random_word()
-            
+
+        if stupid_mode:
+            # use stupid mode that will simply try random words
+            for a in range(attempts):
+                r = self.compare_words(self.pick_random_word(), p)
+                has += r['yellow'] + r['green']
+                hasnot += r['grey']
+                game.append((r['word'], r['pattern']))
+
+                if r['solved']: return {'game': game, 'solved' : True, 'word' : p, 'attempts' : len(game)}
+            return {'game': game, 'solved' : False, 'word' : p, 'attempts' : attempts+1}
+        
+        #ROUND ONE    
         r = self.compare_words (first_attempt, p)
         has += r['yellow'] + r['green']
         hasnot += r['grey']
         game.append((r['word'], r['pattern']))
 
         if r['solved']: return {'game': game, 'solved' : True, 'word' : p, 'attempts' : len(game)}
-            
+
+        #ROUNDS 2-3 (optional)
         #explore for N times a word that does not have any of the letters we found so far
         for a in range(exclude):
             tw = self.pick_random_word (hasnot_letters=hasnot+has, norepeats=True)
             if tw == '': stuck += 1
-                
 
             r = self.compare_words(tw, p)
             has += r['yellow'] + r['green']
@@ -314,25 +328,18 @@ class wordle_solver:
             game.append((r['word'], r['pattern']))
             
             if r['solved']: return {'game': game, 'solved' : True, 'word' : p, 'attempts' : len(game)}
+        
+        #ALL OTHER ROUNDS
+        #for the remaining attempts try to guess using the information gathered so far
+        for a in range(attempts-(exclude+1)):
 
-        if not stupid_mode:
-            #for the remaining attempts try to guess using the information gathered so far
-            for a in range(attempts-(exclude+1)):
-                r = self.compare_words(self.pick_random_word (pattern=r['pattern'], hasnot_letters=hasnot, has_letters=has), p)
-                has += r['yellow'] + r['green']
-                hasnot += r['grey']
-                game.append((r['word'], r['pattern']))
 
-                if r['solved']: return {'game': game, 'solved' : True, 'word' : p, 'attempts' : len(game)}
-        else:
-            #or use stupid mode that will simply try random words
-            for a in range(attempts-(exclude+1)):
-                r = self.compare_words(self.pick_random_word(), p)
-                has += r['yellow'] + r['green']
-                hasnot += r['grey']
-                game.append((r['word'], r['pattern']))
+            r = self.compare_words(self.pick_random_word (pattern=r['pattern'], hasnot_letters=hasnot, has_letters=has), p)
+            has += r['yellow'] + r['green']
+            hasnot += r['grey']
+            game.append((r['word'], r['pattern']))
 
-                if r['solved']: return {'game': game, 'solved' : True, 'word' : p, 'attempts' : len(game)}
+            if r['solved']: return {'game': game, 'solved' : True, 'word' : p, 'attempts' : len(game)}
             
 
         return {'game': game, 'solved' : False, 'word' : p, 'attempts' : attempts+1}
@@ -353,5 +360,5 @@ class wordle_solver:
 
 if __name__ == '__main__':
 
-    g = wordle_solver('full_five_letters_words.txt')
-    print (g.solve(guess_word=None, use_smart=True, exclude=0))
+    g = wordle_solver('wordle_words.txt')
+    print (g.solve(guess_word=None, use_smart=True, exclude=1))
