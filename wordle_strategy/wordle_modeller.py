@@ -127,55 +127,90 @@ class wordle_solver:
 
         if verbose: print ('Looking for word that has [%s] and has not [%s] with pattern [%s]' % (has_letters, hasnot_letters, pattern))
 
-        while continue_search:
-            try:
-                rw = random.choice(wordlist)
-                wordlist.remove(rw)
-            except:
-                #no word match these requirements
-                return ''
+        found_words = []
+        
+        for word in wordlist:
+
+        #while continue_search:
+            #try:
+            #    word = random.choice(wordlist)
+            #    wordlist.remove(rw)
+            #except:
+            #    #no word match these requirements
+            #    return ''
             
             i += 1
             txt = ''
 
             if has_letters:
-                has = self.containsAll(rw, has_letters)
+                has = self.containsAll(word, has_letters)
                 txt += ' contains all letters in %s' % has_letters.upper()
                 
             if hasnot_letters:
-                hasnot = not self.containsAny(rw, hasnot_letters.upper())
+                hasnot = not self.containsAny(word, hasnot_letters.upper())
                 txt += ' does not contain any letter in %s' % hasnot_letters.upper()
 
             if pattern:
-                m1 = all ([(c[0].upper() == c[1].upper()) for c in zip(pattern, rw) if c[0].isupper()])
-                m2 = all ([((c[0].upper() != c[1].upper()) and (c[0].upper() in rw)) for c in zip(pattern, rw) if c[0].islower()])
-                matches = m1 and m2
+                green = all ([(c[0].upper() == c[1].upper()) for c in zip(pattern, word) if c[0].isupper()])
+                yellow = all ([((c[0].upper() != c[1].upper()) and (c[0].upper() in word)) for c in zip(pattern, word) if c[0].islower()])
+                matches = green and yellow
                 txt += ' matches tha pattern %s' % pattern
-                
-            continue_search = (has == False) or (hasnot == False) or (matches == False) or (norepeats and self.hasRepeatingCharacters(rw))
+
+            continue_search = (has == False) or (hasnot == False) or (matches == False) or (norepeats and self.hasRepeatingCharacters(word))
+            if not continue_search: found_words.append(word)
 
 
-        if verbose: print (rw + txt + ' found in %s attempts' % i)
-        return rw
+        if verbose: print (word + txt + ' found in %s attempts' % i)
+        return random.choice(found_words), found_words
 
-    def analyse_frequency(self, wordlist = None):
+    def analyse_frequency(self, wordlist = None, ascount=True):
         '''
         Analyse the frequency of letters in the given dictionary
         '''
+
+        def sorted_dict(d, reverse=False):
+            return dict(sorted(d.items(), key=lambda item: item[1], reverse=False))
+
+        def counttofrequency(d):
+            count = 0
+            total = 0
+            
+            for letter in d:
+                count = d[letter]
+                total += count
+                
+            for letter in d:
+                d[letter] = d[letter] / total
+            
+            return d
 
         if wordlist == None:
             wordlist = self._dictionary
         
         distribution = {}
+        position = []
+        
         for word in wordlist:
+            i = 0
             for letter in word.strip():
                 try:
                     distribution[letter] += 1
+                    position[i][letter] += 1
                 except:
                     distribution.update({letter : 1})
-                    
-        return dict(sorted(distribution.items(), key=lambda item: item[1], reverse=False))
-
+                    try:
+                        position[i].update({letter : 1})
+                    except:
+                        position.append({letter : 1})
+                i+=1
+                
+        #absolute count
+        if ascount:
+            return sorted_dict(distribution), [sorted_dict(pos) for pos in position]
+        
+        #or relative frequency?
+        else:
+            return counttofrequency(sorted_dict(distribution)), [counttofrequency(sorted_dict(pos)) for pos in position]
 
     def compare_words(self, guess, word):
         '''
@@ -248,7 +283,7 @@ class wordle_solver:
             "Return first n items of the iterable as a list"
             return list(islice(iterable, n))
         
-        fr = self.analyse_frequency(wordlist)
+        fr, position = self.analyse_frequency(wordlist)
         result = {}
         
         if wordlist == None:
@@ -281,7 +316,7 @@ class wordle_solver:
         stuck = 0
 
         if guess_word == None:
-            p = self.pick_random_word()
+            p, _ = self.pick_random_word()
         else:
             p = guess_word
 
@@ -295,12 +330,13 @@ class wordle_solver:
             
         else:
             #use a random word at the beginning
-            first_attempt = self.pick_random_word()
+            first_attempt, _ = self.pick_random_word()
 
         if stupid_mode:
             # use stupid mode that will simply try random words
             for a in range(attempts):
-                r = self.compare_words(self.pick_random_word(), p)
+                w, _ = self.pick_random_word()
+                r = self.compare_words(w, p)
                 has += r['yellow'] + r['green']
                 hasnot += r['grey']
                 game.append((r['word'], r['pattern']))
@@ -318,23 +354,28 @@ class wordle_solver:
 
         #ROUNDS 2-3 (optional)
         #explore for N times a word that does not have any of the letters we found so far
+        excluded = 0
         for a in range(exclude):
-            tw = self.pick_random_word (hasnot_letters=hasnot+has, norepeats=True)
-            if tw == '': stuck += 1
+            try:
+                tw, _ = self.pick_random_word (hasnot_letters=hasnot+has, norepeats=True)
+            except:
+                #a word which satisfies these criteria may not exist
+                break
 
             r = self.compare_words(tw, p)
             has += r['yellow'] + r['green']
             hasnot += r['grey']
             game.append((r['word'], r['pattern']))
+            excluded += 1
             
             if r['solved']: return {'game': game, 'solved' : True, 'word' : p, 'attempts' : len(game)}
         
         #ALL OTHER ROUNDS
         #for the remaining attempts try to guess using the information gathered so far
-        for a in range(attempts-(exclude+1)):
+        for a in range(attempts - (excluded + 1)):
 
-
-            r = self.compare_words(self.pick_random_word (pattern=r['pattern'], hasnot_letters=hasnot, has_letters=has), p)
+            w, _ = self.pick_random_word (pattern=r['pattern'], hasnot_letters=hasnot, has_letters=has)
+            r = self.compare_words(w, p)
             has += r['yellow'] + r['green']
             hasnot += r['grey']
             game.append((r['word'], r['pattern']))
