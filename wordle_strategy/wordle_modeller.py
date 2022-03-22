@@ -151,17 +151,20 @@ class wordle_solver:
                 txt += ' does not contain any letter in %s' % hasnot_letters.upper()
 
             if pattern:
-                green = all ([(c[0].upper() == c[1].upper()) for c in zip(pattern, word) if c[0].isupper()])
-                yellow = all ([((c[0].upper() != c[1].upper()) and (c[0].upper() in word)) for c in zip(pattern, word) if c[0].islower()])
-                matches = green and yellow
-                txt += ' matches tha pattern %s' % pattern
+                for pat in pattern:
+                    green = all ([(c[0].upper() == c[1].upper()) for c in zip(pat, word) if c[0].isupper()])
+                    yellow = all ([((c[0].upper() != c[1].upper()) and (c[0].upper() in word)) for c in zip(pat, word) if c[0].islower()])
+                    matches = green and yellow
+                    if not matches: break
+                    txt += ' matches tha pattern %s' % pat
+                    
 
             continue_search = (has == False) or (hasnot == False) or (matches == False) or (norepeats and self.hasRepeatingCharacters(word))
             if not continue_search: found_words.append(word)
 
 
         if verbose: print (word + txt + ' found in %s attempts' % i)
-        return random.choice(found_words), found_words
+        return random.choice(found_words), self.frequency_rank(found_words)
 
     def analyse_frequency(self, wordlist = None, ascount=True):
         '''
@@ -357,7 +360,8 @@ class wordle_solver:
         excluded = 0
         for a in range(exclude):
             try:
-                tw, _ = self.pick_random_word (hasnot_letters=hasnot+has, norepeats=True)
+                _, possibilities_left = self.pick_random_word (hasnot_letters=hasnot+has, norepeats=True)
+                tw = possibilities_left[0]
             except:
                 #a word which satisfies these criteria may not exist
                 break
@@ -373,8 +377,11 @@ class wordle_solver:
         #ALL OTHER ROUNDS
         #for the remaining attempts try to guess using the information gathered so far
         for a in range(attempts - (excluded + 1)):
-
-            w, _ = self.pick_random_word (pattern=r['pattern'], hasnot_letters=hasnot, has_letters=has)
+            
+            pattern_history = [p for _,p in game]
+            w, possibilities_left = self.pick_random_word (pattern=pattern_history, hasnot_letters=hasnot, has_letters=has)
+            if len(possibilities_left) > 1: w = possibilities_left[0]
+            
             r = self.compare_words(w, p)
             has += r['yellow'] + r['green']
             hasnot += r['grey']
