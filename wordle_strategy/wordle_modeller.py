@@ -151,6 +151,7 @@ class wordle_solver:
                 txt += ' does not contain any letter in %s' % hasnot_letters.upper()
 
             if pattern:
+                if type(pattern) == str: pattern = [pattern]
                 for pat in pattern:
                     green = all ([(c[0].upper() == c[1].upper()) for c in zip(pat, word) if c[0].isupper()])
                     yellow = all ([((c[0].upper() != c[1].upper()) and (c[0].upper() in word)) for c in zip(pat, word) if c[0].islower()])
