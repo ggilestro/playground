@@ -65,7 +65,7 @@ class wordle_solver:
     def __init__(self, dict_file = "words_alpha.txt", word_length=5, common_words=20):
         
         self._refresh_dictionary(dict_file, word_length)
-        self.common_words = self.frequency_rank(limit=common_words)
+        self.common_words = self.frequency_rank(limit=common_words, exclude_repeats=True)
 
     def _refresh_dictionary (self, dict_file, word_length):
         self._dictionary = self.get_words(dict_file, word_length)
@@ -279,7 +279,7 @@ class wordle_solver:
         except:
             return { word.upper(): 'not found', 'total' : len(allwords) }
 
-    def frequency_rank(self, wordlist=None, limit=50, descending=True):
+    def frequency_rank(self, wordlist=None, limit=50, exclude_repeats=False, descending=True):
         
         from itertools import islice
 
@@ -293,7 +293,7 @@ class wordle_solver:
         if wordlist == None:
             wordlist = self._dictionary
 
-        if limit:
+        if exclude_repeats:
             wordlist = [word for word in wordlist if not self.hasRepeatingCharacters(word)]
 
         for word in wordlist:
