@@ -6,6 +6,10 @@ import argparse
 import os
 import pathlib
 import logging
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Configure logging
 logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
@@ -39,8 +43,9 @@ def create_batches(parsed_srt, batch_size=15):
     return batches
 
 # Function to translate text using Openrouter.ai with Claude
-def translate_batch(batch, api_key, language):
-    url = "https://openrouter.ai/api/v1/chat/completions"
+def translate_batch(batch, api_key, language, api_url=None, model=None):
+    url = api_url or os.environ.get('OPENROUTER_API_URL', 'https://openrouter.ai/api/v1/chat/completions')
+    selected_model = model or os.environ.get('OPENROUTER_MODEL', 'anthropic/claude-3-5-sonnet')
     
     # Create a structured format for the batch
     batch_text = ""
@@ -58,7 +63,7 @@ def translate_batch(batch, api_key, language):
     }
     
     data = {
-        "model": "anthropic/claude-3-7-sonnet",
+        "model": selected_model,
         "messages": [
             {"role": "system", "content": f"You are a professional subtitle translator that translates to {language}. Maintain the meaning and tone of the original text. Do not add or remove content. Return ONLY the translated text for each subtitle, keeping the 'SUBTITLE X:' format intact."},
             {"role": "user", "content": f"Translate these subtitles to {language}. Keep the format with 'SUBTITLE X:' markers:\n\n{batch_text}"}
@@ -222,13 +227,13 @@ def generate_output_filename(input_file, language):
     return result
 
 # Main process
-def translate_srt(input_file, output_file=None, api_key=None, language='Italian', batch_size=15):
+def translate_srt(input_file, output_file=None, api_key=None, language=None, batch_size=None, api_url=None, model=None):
     if logger.level == logging.DEBUG:
         logger.debug(f"Starting translation process for {input_file}")
         logger.debug(f"Parameters: language={language}, batch_size={batch_size}")
         logger.debug(f"API key present: {'Yes' if api_key else 'No'}")
     
-    # Get API key from environment if not provided
+    # Set defaults from environment variables
     if not api_key:
         api_key = os.environ.get('OPENROUTER_API_KEY')
         if logger.level == logging.DEBUG:
@@ -236,6 +241,18 @@ def translate_srt(input_file, output_file=None, api_key=None, language='Italian'
         
         if not api_key:
             raise ValueError("API key is required. Please provide it as an argument or set the OPENROUTER_API_KEY environment variable.")
+    
+    if not language:
+        language = os.environ.get('DEFAULT_LANGUAGE', 'Italian')
+    
+    if not batch_size:
+        batch_size = int(os.environ.get('DEFAULT_BATCH_SIZE', '15'))
+    
+    if not api_url:
+        api_url = os.environ.get('OPENROUTER_API_URL', 'https://openrouter.ai/api/v1/chat/completions')
+    
+    if not model:
+        model = os.environ.get('OPENROUTER_MODEL', 'anthropic/claude-3-5-sonnet')
     
     # Generate output filename if not provided
     if not output_file:
@@ -273,7 +290,7 @@ def translate_srt(input_file, output_file=None, api_key=None, language='Italian'
                 if logger.level == logging.DEBUG:
                     logger.debug(f"Translation attempt {attempt+1}/{max_retries} for batch {i+1}")
                 
-                translated_batch_text = translate_batch(batch, api_key, language)
+                translated_batch_text = translate_batch(batch, api_key, language, api_url, model)
                 
                 if translated_batch_text:
                     if logger.level == logging.DEBUG:
@@ -327,8 +344,10 @@ if __name__ == "__main__":
     parser.add_argument('--input', required=True, help='Input SRT file')
     parser.add_argument('--output', help='Output SRT file (optional, will be auto-generated if not provided)')
     parser.add_argument('--api_key', help='OpenRouter API key (can also use OPENROUTER_API_KEY env variable)')
-    parser.add_argument('--language', default='Italian', help='Target language (default: Italian)')
-    parser.add_argument('--batch_size', type=int, default=15, help='Number of subtitles per batch (default: 15)')
+    parser.add_argument('--language', help='Target language (default from .env or Italian)')
+    parser.add_argument('--batch_size', type=int, help='Number of subtitles per batch (default from .env or 15)')
+    parser.add_argument('--api_url', help='OpenRouter API URL (default from .env)')
+    parser.add_argument('--model', help='Model to use (default from .env)')
     parser.add_argument('--debug', action='store_true', help='Enable debug logging')
     
     args = parser.parse_args()
@@ -345,5 +364,5 @@ if __name__ == "__main__":
         logger.error("Error: API key is required. Please provide it with --api_key or set the OPENROUTER_API_KEY environment variable.")
         exit(1)
     
-    output_file = translate_srt(args.input, args.output, api_key, args.language, args.batch_size)
+    output_file = translate_srt(args.input, args.output, api_key, args.language, args.batch_size, args.api_url, args.model)
     logger.info(f"Translation completed! Output saved to {output_file}")
